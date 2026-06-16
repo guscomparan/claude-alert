@@ -1,0 +1,10 @@
+# OS / editor cruft
+.DS_Store
+*.swp
+*~
+
+# Backups created by install.sh when merging settings
+*.bak
+
+# Local Claude Code overrides (per-user, shouldn't be shared)
+.claude/settings.local.json

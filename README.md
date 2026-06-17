@@ -81,8 +81,21 @@ near the top:
 const DEFAULTS = {
   message: 'Response finished, ready to continue',   // 👈 your text here
   voice: '',                                          // 👈 a voice name, or '' for default
+  announceProject: true,                              // 👈 also say the project folder name
+  projectPhrase: 'We are working on',                 // 👈 words before the folder name
 };
 ```
+
+### Knowing *which* project finished
+
+By default the voice appends the **project folder name** at the end — e.g.
+"Response finished, ready to continue. **We are working on my-api**". Handy when you have
+several Claude Code windows open and want to know which one just finished without looking.
+Hyphens and underscores are read as spaces (`my-api` → "my api").
+
+- Change the connector words with `projectPhrase` (e.g. `'Estamos trabajando en'`), or set
+  it to `''` to speak just the bare folder name. Env override: `CLAUDE_ALERT_PROJECT_PHRASE`.
+- Turn the whole thing off with `announceProject: false`, or `CLAUDE_ALERT_NO_PROJECT=1`.
 
 If you already installed it into a project, edit that project's copy at
 `<project>/.claude/claude-alert.js` (the installer puts a copy there).
@@ -97,6 +110,8 @@ Set these before launching Claude Code — handy for trying things or per-machin
 | `CLAUDE_ALERT_VOICE` | system default | voice name (see below) |
 | `CLAUDE_ALERT_CHIME` | OS default sound | chime sound file (macOS/Linux) |
 | `CLAUDE_ALERT_SILENT` | `0` | set to `1` to mute |
+| `CLAUDE_ALERT_NO_PROJECT` | `0` | set to `1` to **not** speak the project folder name |
+| `CLAUDE_ALERT_PROJECT_PHRASE` | `We are working on` | words spoken before the folder name (`''` = none) |
 
 **Finding voice names:**
 - macOS: `say -v '?'` (e.g. `Samantha`, `Daniel`, `Karen`)

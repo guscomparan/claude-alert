@@ -22,6 +22,12 @@ const DEFAULTS = {
   message: 'Response finished, ready to continue',
   // 👇 Leave empty for the system default voice, or set a voice name
   voice: '',
+  // 👇 Also speak the project folder name at the end (so you know WHICH project).
+  //    Set to false to turn it off, or use env var CLAUDE_ALERT_NO_PROJECT=1
+  announceProject: true,
+  // 👇 Words spoken right before the folder name, e.g. "We are working on claude alert".
+  //    Leave empty ('') to just say the bare folder name.
+  projectPhrase: 'We are working on',
 };
 
 if (process.env.CLAUDE_ALERT_SILENT === '1') process.exit(0);
@@ -30,6 +36,31 @@ const { spawn } = require('child_process');
 
 const MESSAGE = process.env.CLAUDE_ALERT_MESSAGE || DEFAULTS.message;
 const VOICE = process.env.CLAUDE_ALERT_VOICE || DEFAULTS.voice;
+
+// Figure out the project folder name from the path Claude Code provides, so the
+// voice can tell you WHICH project just finished. Hyphens/underscores become
+// spaces so it reads naturally (e.g. "claude-alert" -> "claude alert").
+const ANNOUNCE_PROJECT =
+  process.env.CLAUDE_ALERT_NO_PROJECT === '1' ? false : DEFAULTS.announceProject;
+
+function projectName() {
+  const dir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const base = dir.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
+  return base.replace(/[-_]+/g, ' ').trim();
+}
+
+// The full text the voice actually speaks.
+const PROJECT_PHRASE =
+  process.env.CLAUDE_ALERT_PROJECT_PHRASE ?? DEFAULTS.projectPhrase;
+
+function projectSuffix() {
+  const name = projectName();
+  if (!name) return '';
+  return PROJECT_PHRASE ? `${PROJECT_PHRASE} ${name}` : name;
+}
+
+const SPOKEN =
+  ANNOUNCE_PROJECT && projectSuffix() ? `${MESSAGE}. ${projectSuffix()}` : MESSAGE;
 
 // Run a list of candidate commands, stopping at the first one that succeeds.
 // A command that is missing (spawn error) or exits non-zero falls through to
@@ -58,7 +89,7 @@ const done = () => process.exit(0);
 
 if (platform === 'darwin') {
   const chime = process.env.CLAUDE_ALERT_CHIME || '/System/Library/Sounds/Glass.aiff';
-  const sayArgs = VOICE ? ['-v', VOICE, MESSAGE] : [MESSAGE];
+  const sayArgs = VOICE ? ['-v', VOICE, SPOKEN] : [SPOKEN];
   // chime first, then speak
   tryFirst([{ cmd: 'afplay', args: [chime] }], () => {
     tryFirst([{ cmd: 'say', args: sayArgs }], done);
@@ -70,7 +101,7 @@ if (platform === 'darwin') {
     '[console]::beep(880,150);',
     '$s = New-Object System.Speech.Synthesis.SpeechSynthesizer;',
     selectVoice,
-    `$s.Speak('${psQuote(MESSAGE)}');`,
+    `$s.Speak('${psQuote(SPOKEN)}');`,
   ].join(' ');
   tryFirst(
     [
@@ -95,8 +126,8 @@ if (platform === 'darwin') {
   const speak = () =>
     tryFirst(
       [
-        { cmd: 'spd-say', args: ['--wait', MESSAGE] },
-        { cmd: 'espeak', args: [MESSAGE] },
+        { cmd: 'spd-say', args: ['--wait', SPOKEN] },
+        { cmd: 'espeak', args: [SPOKEN] },
       ],
       done
     );

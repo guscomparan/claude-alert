@@ -28,6 +28,12 @@ short message:
 The question hook runs with `"async": true`, so the question appears right away instead of
 waiting for the voice to finish.
 
+**Background agents:** when Claude launches agents (or a workflow) in the background, it
+often ends its turn just to wait for them — and `Stop` fires then too. The script checks the
+`background_tasks` list Claude Code passes to the hook and stays quiet while any agent or
+workflow is still running, so you hear "I've finished" only once the last one is done and
+the final response is there. Background shells (dev servers, watchers) don't hold it back.
+
 It's written in Node because Claude Code itself runs on Node — so `node` is guaranteed to
 be available on every machine, with nothing extra to install. The script picks the right
 sound tool for the OS automatically:

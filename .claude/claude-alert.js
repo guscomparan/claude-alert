@@ -6,6 +6,8 @@
  * Triggered by Claude Code hooks (see .claude/settings.json):
  *   Stop                          -> node claude-alert.js            ("I've finished with ...")
  *   PreToolUse on AskUserQuestion -> node claude-alert.js question   ("I've questions related to ...")
+ * The "finished" alert stays quiet while background agents are still running,
+ * so it only plays once the final response is really there.
  * Cross-platform: works on macOS, Linux, and Windows. Runs on Node, which is
  * always present because Claude Code itself runs on Node — no extra install.
  *
@@ -95,6 +97,44 @@ function projectSuffix() {
 const SPOKEN =
   ANNOUNCE_PROJECT && projectSuffix() ? `${MESSAGE} ${projectSuffix()}` : MESSAGE;
 
+// Claude Code passes the hook event as JSON on stdin. Read it (if there is any)
+// and hand the parsed object to cb; anything unreadable becomes {}.
+function readHookInput(cb) {
+  if (process.stdin.isTTY) return cb({}); // run by hand from a terminal
+  let data = '';
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timer);
+    let input = {};
+    try {
+      input = JSON.parse(data) || {};
+    } catch (_) {}
+    cb(input);
+  };
+  const timer = setTimeout(finish, 1000);
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (chunk) => (data += chunk));
+  process.stdin.on('end', finish);
+  process.stdin.on('error', finish);
+}
+
+// The Stop hook also fires when Claude ends its turn just to wait for background
+// agents it launched; Claude Code lists those in `background_tasks`. While any
+// agent or workflow is still running, the "finished" alert stays quiet — it
+// plays on the later Stop, after the last agent is done and the final response
+// is written. Background shells (dev servers, watchers) don't hold it back.
+const AGENT_TASK_TYPES = ['subagent', 'workflow'];
+const DONE_STATUSES = ['completed', 'failed', 'killed', 'stopped', 'cancelled'];
+
+function agentsStillRunning(input) {
+  const tasks = Array.isArray(input.background_tasks) ? input.background_tasks : [];
+  return tasks.some(
+    (t) => t && AGENT_TASK_TYPES.includes(t.type) && !DONE_STATUSES.includes(t.status)
+  );
+}
+
 // Run a list of candidate commands, stopping at the first one that succeeds.
 // A command that is missing (spawn error) or exits non-zero falls through to
 // the next candidate. Calls done() when one succeeds or the list is exhausted.
@@ -120,53 +160,58 @@ const psQuote = (s) => s.replace(/'/g, "''");
 const platform = process.platform;
 const done = () => process.exit(0);
 
-if (platform === 'darwin') {
-  const chime = IS_QUESTION
-    ? process.env.CLAUDE_ALERT_QUESTION_CHIME || '/System/Library/Sounds/Submarine.aiff'
-    : process.env.CLAUDE_ALERT_CHIME || '/System/Library/Sounds/Glass.aiff';
-  const sayArgs = VOICE ? ['-v', VOICE, SPOKEN] : [SPOKEN];
-  // chime first, then speak
-  tryFirst([{ cmd: 'afplay', args: [chime] }], () => {
-    tryFirst([{ cmd: 'say', args: sayArgs }], done);
-  });
-} else if (platform === 'win32') {
-  const selectVoice = VOICE ? `$s.SelectVoice('${psQuote(VOICE)}');` : '';
-  const ps = [
-    'Add-Type -AssemblyName System.Speech;',
-    // question: two rising beeps; finished: one beep
-    IS_QUESTION ? '[console]::beep(660,120); [console]::beep(990,150);' : '[console]::beep(880,150);',
-    '$s = New-Object System.Speech.Synthesis.SpeechSynthesizer;',
-    selectVoice,
-    `$s.Speak('${psQuote(SPOKEN)}');`,
-  ].join(' ');
-  tryFirst(
-    [
-      { cmd: 'powershell', args: ['-NoProfile', '-Command', ps] },
-      { cmd: 'pwsh', args: ['-NoProfile', '-Command', ps] },
-    ],
-    done
-  );
-} else {
-  // Linux / other Unix
-  const chime =
-    (IS_QUESTION ? process.env.CLAUDE_ALERT_QUESTION_CHIME : process.env.CLAUDE_ALERT_CHIME) || '';
-  const playChime = (next) => {
-    if (!chime) return next();
+function play() {
+  if (platform === 'darwin') {
+    const chime = IS_QUESTION
+      ? process.env.CLAUDE_ALERT_QUESTION_CHIME || '/System/Library/Sounds/Submarine.aiff'
+      : process.env.CLAUDE_ALERT_CHIME || '/System/Library/Sounds/Glass.aiff';
+    const sayArgs = VOICE ? ['-v', VOICE, SPOKEN] : [SPOKEN];
+    // chime first, then speak
+    tryFirst([{ cmd: 'afplay', args: [chime] }], () => {
+      tryFirst([{ cmd: 'say', args: sayArgs }], done);
+    });
+  } else if (platform === 'win32') {
+    const selectVoice = VOICE ? `$s.SelectVoice('${psQuote(VOICE)}');` : '';
+    const ps = [
+      'Add-Type -AssemblyName System.Speech;',
+      // question: two rising beeps; finished: one beep
+      IS_QUESTION ? '[console]::beep(660,120); [console]::beep(990,150);' : '[console]::beep(880,150);',
+      '$s = New-Object System.Speech.Synthesis.SpeechSynthesizer;',
+      selectVoice,
+      `$s.Speak('${psQuote(SPOKEN)}');`,
+    ].join(' ');
     tryFirst(
       [
-        { cmd: 'paplay', args: [chime] },
-        { cmd: 'aplay', args: [chime] },
-      ],
-      next
-    );
-  };
-  const speak = () =>
-    tryFirst(
-      [
-        { cmd: 'spd-say', args: ['--wait', SPOKEN] },
-        { cmd: 'espeak', args: [SPOKEN] },
+        { cmd: 'powershell', args: ['-NoProfile', '-Command', ps] },
+        { cmd: 'pwsh', args: ['-NoProfile', '-Command', ps] },
       ],
       done
     );
-  playChime(speak);
+  } else {
+    // Linux / other Unix
+    const chime =
+      (IS_QUESTION ? process.env.CLAUDE_ALERT_QUESTION_CHIME : process.env.CLAUDE_ALERT_CHIME) || '';
+    const playChime = (next) => {
+      if (!chime) return next();
+      tryFirst(
+        [
+          { cmd: 'paplay', args: [chime] },
+          { cmd: 'aplay', args: [chime] },
+        ],
+        next
+      );
+    };
+    const speak = () =>
+      tryFirst(
+        [
+          { cmd: 'spd-say', args: ['--wait', SPOKEN] },
+          { cmd: 'espeak', args: [SPOKEN] },
+        ],
+        done
+      );
+    playChime(speak);
+  }
 }
+
+if (IS_QUESTION) play();
+else readHookInput((input) => (agentsStillRunning(input) ? done() : play()));

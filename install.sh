@@ -6,8 +6,9 @@
 #   ./install.sh                 # install into the current directory
 #   ./install.sh /path/to/proj   # install into another project
 #
-# Copies the alert script into <target>/.claude/ and adds a "Stop" hook to
-# <target>/.claude/settings.json (merging if one already exists).
+# Copies the alert script into <target>/.claude/ and adds the "Stop" and
+# "PreToolUse" (AskUserQuestion) hooks to <target>/.claude/settings.json
+# (merging if one already exists).
 
 set -euo pipefail
 
@@ -25,9 +26,9 @@ if [ -f "$SETTINGS" ] && command -v jq >/dev/null 2>&1; then
   tmp="$(mktemp)"
   jq --argjson add "$NEW" '
     .hooks //= {} |
-    .hooks.Stop = ((.hooks.Stop // []) + $add.hooks.Stop)
+    reduce ($add.hooks | to_entries[]) as $e (.; .hooks[$e.key] = ((.hooks[$e.key] // []) + $e.value))
   ' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
-  echo "OK Merged Stop hook into existing $SETTINGS"
+  echo "OK Merged hooks into existing $SETTINGS"
 elif [ -f "$SETTINGS" ]; then
   cp "$SETTINGS" "$SETTINGS.bak"
   cp "$SRC_DIR/.claude/settings.json" "$SETTINGS"

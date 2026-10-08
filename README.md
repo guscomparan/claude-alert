@@ -1,8 +1,9 @@
 # claude-alert 🔔
 
-Make **Claude Code** play a **chime + spoken voice** ("Response finished, ready to
-continue") every time it finishes a response — so you can look away and get pinged when
-it's your turn again.
+Make **Claude Code** play a **chime + spoken voice** ("I've finished with my project")
+every time it finishes a response — and a **different chime** + "I've questions related
+to my project" when it stops to ask you a multiple-choice question — so you can look away and
+get pinged when it's your turn again.
 
 - ✅ **No API key, no account, no network.** Uses your operating system's built-in
   text-to-speech.
@@ -14,10 +15,18 @@ it's your turn again.
 
 ## How it works
 
-Claude Code can run a **"Stop" hook** — a command it executes automatically every time the
-main agent finishes replying. This package wires that hook to a small Node.js script,
+Claude Code can run **hooks** — commands it executes automatically at certain moments. This
+package wires two of them to a small Node.js script,
 [`.claude/claude-alert.js`](.claude/claude-alert.js), which plays a chime and then speaks a
-short message.
+short message:
+
+| Hook | When | You hear (macOS) |
+|------|------|------------------|
+| `Stop` | Claude finished replying | *Glass* chime + "I've finished with …" |
+| `PreToolUse` on `AskUserQuestion` | Claude shows a question with options to pick | *Submarine* chime + "I've questions related to …" |
+
+The question hook runs with `"async": true`, so the question appears right away instead of
+waiting for the voice to finish.
 
 It's written in Node because Claude Code itself runs on Node — so `node` is guaranteed to
 be available on every machine, with nothing extra to install. The script picks the right
@@ -79,17 +88,19 @@ near the top:
 
 ```js
 const DEFAULTS = {
-  message: 'Response finished, ready to continue',   // 👈 your text here
+  message: "I've finished",                           // 👈 your text here
+  questionMessage: "I've questions",                  // 👈 text when Claude asks a question
   voice: '',                                          // 👈 a voice name, or '' for default
   announceProject: true,                              // 👈 also say the project folder name
-  projectPhrase: 'We are working on',                 // 👈 words before the folder name
+  projectPhrase: 'with',                              // 👈 words before the folder name
+  questionProjectPhrase: 'related to',                // 👈 same, for questions
 };
 ```
 
 ### Knowing *which* project finished
 
 By default the voice appends the **project folder name** at the end — e.g.
-"Response finished, ready to continue. **We are working on my-api**". Handy when you have
+"I've finished **with my-api**". Handy when you have
 several Claude Code windows open and want to know which one just finished without looking.
 Hyphens and underscores are read as spaces (`my-api` → "my api").
 
@@ -106,12 +117,15 @@ Set these before launching Claude Code — handy for trying things or per-machin
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `CLAUDE_ALERT_MESSAGE` | `Response finished, ready to continue` | spoken text |
+| `CLAUDE_ALERT_MESSAGE` | `I've finished` | spoken text when Claude finishes |
+| `CLAUDE_ALERT_QUESTION_MESSAGE` | `I've questions` | spoken text when Claude asks a question |
 | `CLAUDE_ALERT_VOICE` | system default | voice name (see below) |
-| `CLAUDE_ALERT_CHIME` | OS default sound | chime sound file (macOS/Linux) |
+| `CLAUDE_ALERT_CHIME` | `Glass.aiff` on macOS | chime when Claude finishes (macOS/Linux) |
+| `CLAUDE_ALERT_QUESTION_CHIME` | `Submarine.aiff` on macOS | chime when Claude asks a question (macOS/Linux) |
 | `CLAUDE_ALERT_SILENT` | `0` | set to `1` to mute |
 | `CLAUDE_ALERT_NO_PROJECT` | `0` | set to `1` to **not** speak the project folder name |
-| `CLAUDE_ALERT_PROJECT_PHRASE` | `We are working on` | words spoken before the folder name (`''` = none) |
+| `CLAUDE_ALERT_PROJECT_PHRASE` | `with` | words spoken before the folder name (`''` = none) |
+| `CLAUDE_ALERT_QUESTION_PROJECT_PHRASE` | `related to` | same, for the question alert |
 
 **Finding voice names:**
 - macOS: `say -v '?'` (e.g. `Samantha`, `Daniel`, `Karen`)
@@ -130,11 +144,17 @@ export CLAUDE_ALERT_VOICE="Samantha"
 You don't need Claude Code to test the sound — just run the script directly:
 
 ```bash
-node .claude/claude-alert.js        # macOS / Linux
-node .\.claude\claude-alert.js      # Windows
+node .claude/claude-alert.js                 # "finished" alert (macOS / Linux)
+node .claude/claude-alert.js question        # "question" alert
+node .\.claude\claude-alert.js               # Windows
 ```
 
 You should hear the chime followed by the spoken message.
+
+> **Installed both globally and in a project?** If `~/.claude/settings.json` already runs
+> `~/.claude/claude-alert.js`, a project's own copy stays quiet so you don't hear two
+> overlapping voices. Running a project copy by hand inside such a setup is silent — test
+> with `node ~/.claude/claude-alert.js` instead.
 
 ---
 
@@ -143,7 +163,8 @@ You should hear the chime followed by the spoken message.
 In the project you installed it into:
 
 1. Delete `<project>/.claude/claude-alert.js`
-2. Remove the `"Stop"` block from `<project>/.claude/settings.json`
+2. Remove the `"Stop"` block and the `"PreToolUse"` → `AskUserQuestion` entry from
+   `<project>/.claude/settings.json`
 
 ---
 

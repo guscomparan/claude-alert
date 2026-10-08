@@ -5,8 +5,9 @@
 #   .\install.ps1                       # install into the current directory
 #   .\install.ps1 C:\path\to\project    # install into another project
 #
-# Copies the alert script into <target>\.claude\ and adds a "Stop" hook to
-# <target>\.claude\settings.json (merging if one already exists).
+# Copies the alert script into <target>\.claude\ and adds the "Stop" and
+# "PreToolUse" (AskUserQuestion) hooks to <target>\.claude\settings.json
+# (merging if one already exists).
 
 param(
   [string]$Target = (Get-Location).Path
@@ -27,12 +28,14 @@ $NewJson  = Get-Content (Join-Path $SrcDir '.claude\settings.json') -Raw | Conve
 if (Test-Path $Settings) {
   $existing = Get-Content $Settings -Raw | ConvertFrom-Json
   if (-not $existing.hooks)      { $existing | Add-Member -NotePropertyName hooks -NotePropertyValue (@{}) -Force }
-  $stop = @()
-  if ($existing.hooks.Stop)      { $stop += $existing.hooks.Stop }
-  $stop += $NewJson.hooks.Stop
-  $existing.hooks | Add-Member -NotePropertyName Stop -NotePropertyValue $stop -Force
+  foreach ($event in $NewJson.hooks.PSObject.Properties.Name) {
+    $merged = @()
+    if ($existing.hooks.$event) { $merged += $existing.hooks.$event }
+    $merged += $NewJson.hooks.$event
+    $existing.hooks | Add-Member -NotePropertyName $event -NotePropertyValue $merged -Force
+  }
   $existing | ConvertTo-Json -Depth 20 | Set-Content $Settings -Encoding UTF8
-  Write-Host "OK Merged Stop hook into existing $Settings"
+  Write-Host "OK Merged hooks into existing $Settings"
 } else {
   Copy-Item (Join-Path $SrcDir '.claude\settings.json') $Settings -Force
   Write-Host "OK Installed $Settings"

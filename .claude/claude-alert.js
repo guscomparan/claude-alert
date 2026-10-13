@@ -5,7 +5,7 @@
  *
  * Triggered by Claude Code hooks (see .claude/settings.json):
  *   Stop                          -> node claude-alert.js            ("I've finished with ...")
- *   PreToolUse on AskUserQuestion -> node claude-alert.js question   ("I've questions related to ...")
+ *   PreToolUse on AskUserQuestion -> node claude-alert.js question   ("I've questions with ...")
  * The "finished" alert stays quiet while background agents are still running,
  * so it only plays once the final response is really there.
  * Cross-platform: works on macOS, Linux, and Windows. Runs on Node, which is
@@ -37,8 +37,8 @@ const DEFAULTS = {
   // 👇 Words spoken right before the folder name, e.g. "I've finished WITH claude alert".
   //    Leave empty ('') to just say the bare folder name.
   projectPhrase: 'with',
-  // 👇 Same, for questions: "I've questions RELATED TO claude alert".
-  questionProjectPhrase: 'related to',
+  // 👇 Same, for questions: "I've questions WITH claude alert".
+  questionProjectPhrase: 'with',
 };
 
 if (process.env.CLAUDE_ALERT_SILENT === '1') process.exit(0);
@@ -163,7 +163,7 @@ const done = () => process.exit(0);
 function play() {
   if (platform === 'darwin') {
     const chime = IS_QUESTION
-      ? process.env.CLAUDE_ALERT_QUESTION_CHIME || '/System/Library/Sounds/Submarine.aiff'
+      ? process.env.CLAUDE_ALERT_QUESTION_CHIME || '/System/Library/Sounds/Hero.aiff'
       : process.env.CLAUDE_ALERT_CHIME || '/System/Library/Sounds/Glass.aiff';
     const sayArgs = VOICE ? ['-v', VOICE, SPOKEN] : [SPOKEN];
     // chime first, then speak

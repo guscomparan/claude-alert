@@ -1,8 +1,8 @@
 # claude-alert 🔔
 
 Make **Claude Code** play a **chime + spoken voice** ("I've finished with my project")
-every time it finishes a response — and a **different chime** + "I've questions related
-to my project" when it stops to ask you a multiple-choice question — so you can look away and
+every time it finishes a response — and a **different chime** + "I've questions with my
+project" when it stops to ask you a multiple-choice question — so you can look away and
 get pinged when it's your turn again.
 
 - ✅ **No API key, no account, no network.** Uses your operating system's built-in
@@ -23,7 +23,7 @@ short message:
 | Hook | When | You hear (macOS) |
 |------|------|------------------|
 | `Stop` | Claude finished replying | *Glass* chime + "I've finished with …" |
-| `PreToolUse` on `AskUserQuestion` | Claude shows a question with options to pick | *Submarine* chime + "I've questions related to …" |
+| `PreToolUse` on `AskUserQuestion` | Claude shows a question with options to pick | *Hero* chime + "I've questions with …" |
 
 The question hook runs with `"async": true`, so the question appears right away instead of
 waiting for the voice to finish.
@@ -99,7 +99,7 @@ const DEFAULTS = {
   voice: '',                                          // 👈 a voice name, or '' for default
   announceProject: true,                              // 👈 also say the project folder name
   projectPhrase: 'with',                              // 👈 words before the folder name
-  questionProjectPhrase: 'related to',                // 👈 same, for questions
+  questionProjectPhrase: 'with',                      // 👈 same, for questions
 };
 ```
 
@@ -127,11 +127,11 @@ Set these before launching Claude Code — handy for trying things or per-machin
 | `CLAUDE_ALERT_QUESTION_MESSAGE` | `I've questions` | spoken text when Claude asks a question |
 | `CLAUDE_ALERT_VOICE` | system default | voice name (see below) |
 | `CLAUDE_ALERT_CHIME` | `Glass.aiff` on macOS | chime when Claude finishes (macOS/Linux) |
-| `CLAUDE_ALERT_QUESTION_CHIME` | `Submarine.aiff` on macOS | chime when Claude asks a question (macOS/Linux) |
+| `CLAUDE_ALERT_QUESTION_CHIME` | `Hero.aiff` on macOS | chime when Claude asks a question (macOS/Linux) |
 | `CLAUDE_ALERT_SILENT` | `0` | set to `1` to mute |
 | `CLAUDE_ALERT_NO_PROJECT` | `0` | set to `1` to **not** speak the project folder name |
 | `CLAUDE_ALERT_PROJECT_PHRASE` | `with` | words spoken before the folder name (`''` = none) |
-| `CLAUDE_ALERT_QUESTION_PROJECT_PHRASE` | `related to` | same, for the question alert |
+| `CLAUDE_ALERT_QUESTION_PROJECT_PHRASE` | `with` | same, for the question alert |
 
 **Finding voice names:**
 - macOS: `say -v '?'` (e.g. `Samantha`, `Daniel`, `Karen`)
